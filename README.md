@@ -76,6 +76,16 @@ python app.py
 
 Öffne dann deinen Browser und gehe zu der angezeigten Adresse (normalerweise `http://127.0.0.1:7860`).
 
+
+![image](https://github.com/user-attachments/assets/4027ce3f-4896-4c52-9ce8-e97a99195d7f)
+
+![image](https://github.com/user-attachments/assets/7586124d-5162-4f94-94c9-8d2226f0a963)
+
+![image](https://github.com/user-attachments/assets/8e83f5e4-03b2-4c2d-a583-9fcda468df14)
+
+
+
+
 ## 🛠️ Nutzung
 
 1. **Login/Registrierung:**  Erstelle ein Benutzerkonto oder logge dich ein, um Diskussionen zu speichern und zu verwalten.
