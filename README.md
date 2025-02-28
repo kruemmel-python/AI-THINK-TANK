@@ -1,5 +1,14 @@
 # AI-THINK-TANK
-AI THINK TANK ist eine revolutionäre, KI-gestützte Diskussionsplattform, die Experten aus verschiedenen Fachbereichen simuliert und lebendige Gespräche führt. 
+![image](https://github.com/user-attachments/assets/71f31ebf-aeea-43ce-bb0a-046203eac737)
+
+## 🎯 AI-THINK-TANK – Die Revolution der KI-gestützten Fachgespräche
+AI-THINK-TANK ist keine gewöhnliche KI-Plattform, sondern ein innovatives System, das die Simulation komplexer Fachgespräche mit unterschiedlichen Agentenpersönlichkeiten ermöglicht.
+
+## 🚀 Stellen Sie sich vor: Sie sitzen in einem Raum und beobachten, wie führende Experten aus verschiedenen Disziplinen gemeinsam an einer Problemstellung arbeiten, Argumente austauschen und innovative Lösungen entwickeln – alles durch KI gesteuert!
+
+Dieses System kombiniert modernste NLP-Technologie, Expertenwissen und eine interaktive Gradio-Oberfläche, um fundierte, dynamische und argumentativ hochwertige Diskussionen zu generieren.
+
+AI-THINK-TANK ermöglicht nicht nur einen einfachen Dialog mit KI-Agenten – es erschafft eine vollwertige Debatten- und Diskussionsplattform, in der mehrere virtuelle Experten interagieren, unterschiedliche Sichtweisen vertreten und gemeinsam tiefgehende Analysen durchführen.
 
 # Agentenbasierte Konversationsplattform mit Gemini API und Gradio
 
