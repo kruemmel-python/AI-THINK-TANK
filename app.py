@@ -9,6 +9,10 @@ import os
 import time
 from collections import defaultdict
 from typing import List, Dict, Tuple, Any
+import sqlite3
+from jsonschema import validate, ValidationError
+from docx import Document # Neu: Für Word-Dateien
+from docx.shared import Inches # Für Word-Formatierung
 
 from dotenv import load_dotenv
 from google import genai
@@ -28,8 +32,8 @@ client = genai.Client(api_key=API_KEY)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-API_SLEEP_SECONDS = 10      # Wartezeit nach jedem Request
-API_MAX_RETRIES = 2         # Wie oft bei 503 nochmal probieren
+API_SLEEP_SECONDS = 10
+API_MAX_RETRIES = 3
 
 AUDIT_LOG_FILE = "audit_log.txt"
 EXPIRATION_TIME_SECONDS = 300
@@ -40,44 +44,84 @@ ROLE_PERMISSIONS = {
 PRIORITY_MAP = {"HIGH": 1, "MEDIUM": 2, "LOW": 3}
 
 # ---------------------------
-# 2) Nutzer-Login-System (als JSON)
+# 2) Nutzer-Login-System (JSON & Validierung)
 # ---------------------------
 USER_DATA_FILE = "user_data.json"
-DISCUSSION_DATA_FILE = "discussion_data.json"
+DISCUSSION_DB_FILE = "discussion_data.db"
 RATING_DATA_FILE = "rating_data.json"
+AGENT_CONFIG_FILE = "agent_config.json"
+
+USER_DATA_SCHEMA = {
+    "type": "object",
+    "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+            "type": "object",
+            "properties": {
+                "password": {"type": "string"}
+            },
+            "required": ["password"]
+        }
+    }
+}
+
+AGENT_CONFIG_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "personality": {"type": "string", "enum": ["kritisch", "visionär", "konservativ", "neutral"]},
+            "description": {"type": "string"}
+        },
+        "required": ["name", "personality", "description"]
+    }
+}
+
+
+def load_json_data(filename: str, schema: dict = None) -> Dict[str, Any]:
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if schema:
+                validate(instance=data, schema=schema)
+            return data
+    except FileNotFoundError:
+        logging.warning(f"Datei '{filename}' nicht gefunden. Starte mit leeren Daten.")
+        return {}
+    except json.JSONDecodeError as e:
+        logging.error(f"Fehler beim Lesen von '{filename}': Ungültiges JSON-Format. Details: {e}")
+        return {}
+    except ValidationError as e:
+        logging.error(f"Datei '{filename}' entspricht nicht dem erwarteten Schema: {e}")
+        return {}
+
+def save_json_data(data: Dict[str, Any], filename: str) -> None:
+    try:
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except IOError as e:
+        logging.error(f"Fehler beim Schreiben in Datei '{filename}': {e}")
+
 
 def load_user_data() -> Dict[str, Any]:
-    try:
-        with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
+    return load_json_data(USER_DATA_FILE, USER_DATA_SCHEMA)
 
 def save_user_data(user_data: Dict[str, Any]) -> None:
-    with open(USER_DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(user_data, f, indent=4)
-
-def load_discussion_data() -> Dict[str, Any]:
-    try:
-        with open(DISCUSSION_DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
-def save_discussion_data(discussion_data: Dict[str, Any]) -> None:
-    with open(DISCUSSION_DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(discussion_data, f, indent=4)
+    save_json_data(user_data, USER_DATA_FILE)
 
 def load_rating_data() -> Dict[str, Any]:
-    try:
-        with open(RATING_DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
+    return load_json_data(RATING_DATA_FILE)
 
 def save_rating_data(rating_data: Dict[str, Any]) -> None:
-    with open(RATING_DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(rating_data, f, indent=4)
+    save_json_data(rating_data, RATING_DATA_FILE)
+
+def load_agent_config() -> List[Dict[str, str]]:
+    config = load_json_data(AGENT_CONFIG_FILE, AGENT_CONFIG_SCHEMA)
+    if not isinstance(config, list):
+        logging.error(f"Agentenkonfiguration in '{AGENT_CONFIG_FILE}' ist ungültig oder leer. Stelle sicher, dass es eine Liste ist.")
+        return []
+    return config
+
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
@@ -86,6 +130,11 @@ def verify_password(password: str, hashed_password: str) -> bool:
     return hash_password(password) == hashed_password
 
 def register_user(username: str, password: str) -> str:
+    if not re.match(r"^[a-zA-Z0-9_-]+$", username):
+        return "Ungültiger Nutzername. Nur Buchstaben, Zahlen, '-', '_' erlaubt."
+    if len(password) < 8:
+        return "Passwort muss mindestens 8 Zeichen lang sein."
+
     user_data = load_user_data()
     if username in user_data:
         return "Nutzername bereits vergeben."
@@ -101,7 +150,76 @@ def login_user(username: str, password: str) -> Tuple[str, str]:
     return "Login fehlgeschlagen.", None
 
 # ---------------------------
-# 3) Bewertung der Antwort
+# 3) Datenbank-Interaktion (SQLite für Diskussionen)
+# ---------------------------
+def create_discussion_table():
+    """ Erstellt die Diskussionstabelle, falls nicht vorhanden. """
+    conn = sqlite3.connect(DISCUSSION_DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS discussions (
+            discussion_id TEXT PRIMARY KEY,
+            topic TEXT,
+            agents TEXT,
+            chat_history TEXT,
+            summary TEXT,
+            user TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+create_discussion_table()
+
+def save_discussion_data_db(discussion_id: str, topic: str, agents: List[str], chat_history: List[Dict], summary: str, user: str = None) -> None:
+    """ Speichert Diskussionsdaten in der SQLite Datenbank. """
+    conn = sqlite3.connect(DISCUSSION_DB_FILE)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO discussions (discussion_id, topic, agents, chat_history, summary, user)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (discussion_id, topic, json.dumps(agents), json.dumps(chat_history), summary, user))
+        conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Datenbankfehler beim Speichern der Diskussion '{discussion_id}': {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+def load_discussion_data_db(user: str = None) -> Dict[str, Any]:
+    """ Lädt Diskussionsdaten aus der SQLite Datenbank. Optional für einen bestimmten Nutzer. """
+    conn = sqlite3.connect(DISCUSSION_DB_FILE)
+    cursor = conn.cursor()
+    discussions = {}
+    try:
+        if user:
+            cursor.execute("SELECT * FROM discussions WHERE user = ?", (user,))
+        else:
+            cursor.execute("SELECT * FROM discussions")
+        rows = cursor.fetchall()
+        for row in rows:
+            disc_id, topic, agents_json, chat_history_json, summary, user_name, timestamp = row
+            agents = json.loads(agents_json) if agents_json else []
+            chat_history = json.loads(chat_history_json) if chat_history_json else []
+            discussions[disc_id] = {
+                "topic": topic,
+                "agents": agents,
+                "chat_history": chat_history,
+                "summary": summary,
+                "user": user_name,
+                "timestamp": timestamp
+            }
+    except sqlite3.Error as e:
+        logging.error(f"Datenbankfehler beim Laden der Diskussionen: {e}")
+    finally:
+        conn.close()
+    return discussions
+
+
+# ---------------------------
+# 4) Bewertung der Antwort
 # ---------------------------
 def evaluate_response(response: str) -> str:
     resp_l = response.lower()
@@ -113,7 +231,7 @@ def evaluate_response(response: str) -> str:
         return "neutral"
 
 # ---------------------------
-# 4) Up-/Downvotes
+# 5) Up-/Downvotes
 # ---------------------------
 discussion_ratings = defaultdict(lambda: defaultdict(dict), load_rating_data())
 
@@ -133,19 +251,19 @@ def rate_agent_response(discussion_id: str, iteration: int, agent_name: str, rat
     save_rating_data(discussion_ratings)
 
 # ---------------------------
-# 5) Gemini-API mit Retry und Wartezeit
+# 6) Gemini-API mit Retry, Backoff & Fehleranalyse
 # ---------------------------
 def call_gemini_api(prompt: str) -> Dict[str, str]:
     """
-    Ruft die Gemini-API mit bis zu API_MAX_RETRIES Retries auf,
-    schläft nach jedem Aufruf API_SLEEP_SECONDS Sekunden.
+    Ruft die Gemini-API auf mit erweitertem Retry-Mechanismus und Fehlerbehandlung.
     """
+    retry_delay = API_SLEEP_SECONDS
     for attempt in range(API_MAX_RETRIES + 1):
         try:
             logging.info(f"[{attempt+1}/{API_MAX_RETRIES+1}] Sende Prompt an Gemini: {prompt[:100]}...")
             response = client.models.generate_content(model=MODEL_NAME, contents=[prompt])
 
-            # Warte 10 Sekunden
+            # Wartezeit nach jedem Request
             time.sleep(API_SLEEP_SECONDS)
 
             if not hasattr(response, "text") or not response.text:
@@ -155,22 +273,44 @@ def call_gemini_api(prompt: str) -> Dict[str, str]:
 
             return {"response": response.text}
 
+        except genai.APIError as e:
+            err_s = str(e)
+            logging.error(f"Gemini API Fehler (Versuch {attempt+1}): {err_s}, Status Code: {e.status_code}")
+
+            if e.status_code == 429:
+                if attempt < API_MAX_RETRIES:
+                    retry_delay *= 2
+                    logging.info(f"Rate Limit erreicht. Warte {retry_delay}s und versuche erneut.")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    return {"response": f"API Rate Limit erreicht nach mehreren Versuchen. Bitte später erneut versuchen."}
+            elif e.status_code == 503:
+                if attempt < API_MAX_RETRIES:
+                    logging.info(f"Server überlastet. Warte {retry_delay}s und versuche erneut.")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    return {"response": "Gemini API Server überlastet nach mehreren Versuchen."}
+            elif e.status_code == 401:
+                return {"response": "Authentifizierungsfehler bei der Gemini API. Überprüfen Sie den API-Schlüssel."}
+            else:
+                if attempt < API_MAX_RETRIES:
+                    logging.info(f"Unerwarteter API Fehler, versuche Retry. Warte {retry_delay}s.")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    return {"response": f"Unerwarteter Fehler bei Gemini API Aufruf nach mehreren Versuchen: {err_s}"}
         except Exception as e:
             err_s = str(e)
-            logging.error(f"Fehler bei Gemini API Aufruf (Versuch {attempt+1}): {err_s}")
-            # Wenn 503 Overloaded -> warte und Retry
-            if "503 UNAVAILABLE" in err_s and attempt < API_MAX_RETRIES:
-                logging.info("Überlastet, warte weitere 10s und versuche erneut.")
-                time.sleep(API_SLEEP_SECONDS)
-                continue
-            # Sonst Abbruch
+            logging.error(f"Genereller Fehler bei Gemini API Aufruf (Versuch {attempt+1}): {err_s}")
             return {"response": f"Fehler bei Gemini API Aufruf: {err_s}"}
 
-    # Falls alle Versuche scheitern
-    return {"response": "Unbekannter Fehler nach mehreren Versuchen."}
+    return {"response": "Unbekannter Fehler nach mehreren API-Versuchen."}
+
 
 # ---------------------------
-# 6) Generator-Funktion (Alle Agenten, kein Diagramm)
+# 7) Generator-Funktion (Alle Agenten, kein Diagramm)
 # ---------------------------
 def joint_conversation_with_selected_agents(
     conversation_topic: str,
@@ -193,23 +333,24 @@ def joint_conversation_with_selected_agents(
     agent_outputs = [""] * num_agents
     topic_changed = False
 
-    logging.info(f"Konversation gestartet: {active_agents_names}, iters={iterations}, level={expertise_level}, lang={language}")
+    logging.info(f"Konversation gestartet: {active_agents_names}, iters={iterations}, level={expertise_level}, lang={language}, Diskussions-ID: {discussion_id}")
 
     for i in range(iterations):
         agent_idx = i % num_agents
         current_agent_name = active_agents_names[agent_idx]
-        current_personality = next((a["personality"] for a in selected_agents if a["name"] == current_agent_name), "neutral")
+        current_agent_config = next((a for a in selected_agents if a["name"] == current_agent_name), None)
+        current_personality = current_agent_config.get("personality", "neutral")
+        current_instruction = current_agent_config.get("instruction", "")
 
         prev_agent_name = active_agents_names[(agent_idx - 1) % num_agents]
         prev_output = agent_outputs[(agent_idx - 1) % num_agents]
 
         prompt_txt = (
             f"Wir führen eine Konversation über: '{conversation_topic}'.\n"
-            f"Iteration {i+1}: Agent {current_agent_name} (Spezialist für **{current_agent_name}**) antwortet Agent {prev_agent_name}.\n" # HIER IST DIE ÄNDERUNG!
+            f"Iteration {i+1}: Agent {current_agent_name} (Spezialist für **{current_agent_name}**). {current_instruction}\n"
             f"Agent {prev_agent_name} sagte: {prev_output}\n"
         )
 
-        # Persönlichkeit
         if current_personality == "kritisch":
             prompt_txt += "\nSei kritisch und hinterfrage Annahmen."
         elif current_personality == "visionär":
@@ -217,7 +358,6 @@ def joint_conversation_with_selected_agents(
         elif current_personality == "konservativ":
             prompt_txt += "\nSei konservativ und bleibe bei Bewährtem."
 
-        # Sprache
         if language == "Deutsch":
             prompt_txt += "\n\nAntworte auf Deutsch."
         elif language == "Englisch":
@@ -236,7 +376,6 @@ def joint_conversation_with_selected_agents(
         agent_output = api_resp.get("response", f"Keine Antwort von {current_agent_name}")
         agent_outputs[agent_idx] = agent_output
 
-        # Bewertungscheck
         qual = evaluate_response(agent_output)
         if qual == "schlechte antwort":
             logging.info(f"{current_agent_name} => 'schlechte antwort', retry ...")
@@ -246,7 +385,6 @@ def joint_conversation_with_selected_agents(
                 agent_output = retry_output
             agent_outputs[agent_idx] = agent_output
 
-        # Chat-Historie (assistant)
         chat_history.append({
             "role": "assistant",
             "content": f"Antwort von Agent {current_agent_name} (Iteration {i+1}):\n{agent_output}"
@@ -259,16 +397,13 @@ def joint_conversation_with_selected_agents(
             "---\n\n"
         )
 
-        # yield 5 Werte (keine Diagramme!)
         yield chat_history, formatted_output_chunk, discussion_id, (i+1), current_agent_name
 
-        # Thema wechseln
         if i > (iterations * 0.6) and agent_output == agent_outputs[(agent_idx - 1) % num_agents] and not topic_changed:
             new_topic = "Neues Thema: KI-Trends 2026"
             agent_outputs = [new_topic] * num_agents
             topic_changed = True
 
-    # Zusammenfassung
     sum_prompt = f"Fasse die gesamte Diskussion über '{conversation_topic}' zusammen."
     sum_resp = call_gemini_api(sum_prompt)
     sum_text = sum_resp.get("response", "Keine Zusammenfassung generiert.")
@@ -277,20 +412,11 @@ def joint_conversation_with_selected_agents(
         "content": f"**Zusammenfassung**:\n{sum_text}"
     })
 
-    # Speichern in Diskussionsdaten, falls eingeloggt
-    if user_state:  # user_state != None => eingeloggt
-        ddata = load_discussion_data()
-        ddata[discussion_id] = {
-            "topic": conversation_topic,
-            "agents": active_agents_names,
-            "chat_history": chat_history,
-            "summary": sum_text,
-            "user": user_state
-        }
-        save_discussion_data(ddata)
-        logging.info(f"Diskussion {discussion_id} für {user_state} gespeichert.")
+    if user_state:
+        save_discussion_data_db(discussion_id, conversation_topic, active_agents_names, chat_history, sum_text, user_state)
+        logging.info(f"Diskussion {discussion_id} für {user_state} in Datenbank gespeichert.")
     else:
-        logging.info("Keine Speicherung, kein Benutzer eingeloggt.")
+        logging.info("Keine Speicherung in Datenbank, kein Benutzer eingeloggt.")
 
     final_text = agent_outputs[-1]
     chat_history.append({
@@ -300,17 +426,47 @@ def joint_conversation_with_selected_agents(
 
     logging.info(f"Finale Aussage: {final_text}")
 
-    # Letzter yield, 5 Werte
     yield chat_history, sum_text, discussion_id, None, None
 
 # ---------------------------
-# 7) Gradio App ohne Diagramm
+# 8) Funktion zum Speichern als Word-Datei
+# ---------------------------
+def save_chat_as_word(chat_history: List[Dict], discussion_id: str) -> str:
+    """Speichert den Chatverlauf als formatierte Word-Datei."""
+    document = Document()
+    document.add_heading(f'CipherCore Agenten-Diskussion: {discussion_id}', level=1)
+
+    for message in chat_history:
+        role = message['role']
+        content = message['content']
+        if role == 'user':
+            document.add_paragraph(f"Nutzer:", style='List Bullet').add_run(f" {content}").bold = True
+        elif role == 'assistant':
+            agent_name_match = re.search(r'Agent (.*?)\s', content) # Agentennamen extrahieren
+            agent_name = agent_name_match.group(1) if agent_name_match else "Agent"
+            p = document.add_paragraph(f"{agent_name}:", style='List Bullet')
+            p.add_run(f" {content.split(':\n', 1)[1] if ':\n' in content else content}") # Antwortinhalt extrahieren
+
+    filename = f"CipherCore_Diskussion_{discussion_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+    try:
+        document.save(filename)
+        logging.info(f"Word-Datei '{filename}' erfolgreich gespeichert.")
+        return filename
+    except Exception as e:
+        logging.error(f"Fehler beim Speichern der Word-Datei: {e}")
+        return None # Fehlerfall signalisieren
+
+
+# ---------------------------
+# 9) Gradio App ohne Diagramm - DYNAMISCH mit agent_config.json
 # ---------------------------
 with gr.Blocks() as demo:
-    gr.Markdown("## Verbessertes Beispiel: 10s Delay, 2 Retries, Alle Agenten, Kein Diagramm, Persistenter Login via gr.State")
+    gr.Markdown("## Willkommen bei CipherCore! Ihre Plattform für sichere Programmierung und innovative KI-Lösungen.")
+    gr.Markdown("### Agenten-Konversation")
+    gr.Markdown("Dieses Tool demonstriert eine Konversation zwischen verschiedenen KI-Agenten, die von CipherCore für Sie entwickelt wurden. Wählen Sie Agenten aus, geben Sie ein Thema vor und starten Sie die Diskussion. Wir bei CipherCore legen größten Wert auf Sicherheit und Innovation in allen unseren Lösungen.")
 
     # State für user_name
-    user_state = gr.State(value=None)  # Hier speichern wir den aktuell eingeloggten Nutzer
+    user_state = gr.State(value=None)
 
     with gr.Row():
         with gr.Column():
@@ -332,7 +488,7 @@ with gr.Blocks() as demo:
         if logged_in_user:
             return msg, logged_in_user
         else:
-            return msg, current_usr  # bleibt None
+            return msg, current_usr
 
     def register_event(u_name, u_pass):
         return register_user(u_name, u_pass)
@@ -351,36 +507,20 @@ with gr.Blocks() as demo:
 
     gr.Markdown("---")
 
-    # Agenten-Liste
-    all_agents_list = [
-        # Programmierung
-        "Webentwicklung", "Datenwissenschaft", "Machine Learning", "Scripting und Automation",
-        "Backend Entwicklung und APIs", "Testing und Qualitätssicherung", "Code Generierung und Integration",
-        # Medizin
-        "Neurologie", "Kardiologie", "Virologie", "Onkologie", "Radiologie", "Pädiatrie",
-        # Recht
-        "Strafrecht", "EU-Datenschutz (GDPR, AI Act)", "Arbeitsrecht", "Vertragsrecht", "Immobilienrecht", "Urheberrecht",
-        # Soziales
-        "Sozialarbeit", "Psychologie", "Bildung", "Gemeinschaftsentwicklung", "Sozialpolitik", "Kulturelle Studien",
-        # Wirtschaft
-        "Finanzmärkte", "Startups & Innovation", "Marketing", "HR-Management", "Unternehmensführung", "Nachhaltigkeit",
-        # Politik
-        "Internationale Beziehungen", "Umweltpolitik", "Wirtschaftspolitik", "Sozialpolitik", "Bildungspolitik", "Gesundheitspolitik",
-        # Energie
-        "Erneuerbare Energien", "Kernfusion", "Energieeffizienz", "Energiespeicherung", "Energiepolitik", "Nachhaltige Energie"
-    ]
-
+    # Agenten-Liste DYNAMISCH LADEN
+    agent_config_data = load_agent_config()
     agent_checkboxes = []
     agent_personalities_radios = []
 
-    gr.Markdown("### Wähle Agenten und deren Persönlichkeit:")
-    with gr.Column():
-        for a_name in all_agents_list:
-            with gr.Row():
-                cbox = gr.Checkbox(label=a_name)
-                radio = gr.Radio(["kritisch", "visionär", "konservativ"], value="kritisch", label="Persönlichkeit")
-                agent_checkboxes.append(cbox)
-                agent_personalities_radios.append(radio)
+    with gr.Accordion("Agenten Auswahl (auf-/zuklappbar)", open=False):
+        gr.Markdown("### Wähle Agenten und deren Persönlichkeit:")
+        with gr.Column():
+            for agent_data in agent_config_data:
+                with gr.Row():
+                    cbox = gr.Checkbox(label=agent_data["name"])
+                    radio = gr.Radio(["kritisch", "visionär", "konservativ", "neutral"], value="kritisch", label="Persönlichkeit")
+                    agent_checkboxes.append(cbox)
+                    agent_personalities_radios.append(radio)
 
     iteration_slider = gr.Slider(20, 100, value=10, step=1, label="Anzahl Gesprächsrunden")
     level_radio = gr.Radio(["Beginner", "Fortgeschritten", "Experte"], value="Experte", label="Experten-Level")
@@ -389,18 +529,17 @@ with gr.Blocks() as demo:
     topic_input = gr.Textbox(label="Diskussionsthema")
 
     # Gespeicherte Diskussionen ansehen
-    with gr.Accordion("Gespeicherte Diskussionen"):
+    with gr.Accordion("Gespeicherte Diskussionen", open=False):
         saved_disc_label = gr.JSON()
         load_disc_btn = gr.Button("Diskussionen laden")
 
         def load_discs(current_usr):
-            disc_data = load_discussion_data()
             if current_usr:
-                # Nur die, die zum User passen
-                filtered = {k: v for k, v in disc_data.items() if v.get("user") == current_usr}
-                return filtered
+                disc_data = load_discussion_data_db(current_usr)
             else:
-                return {"Warnung": "Niemand eingeloggt."}
+                disc_data = {"Warnung": "Niemand eingeloggt."}
+            return disc_data
+
 
         load_disc_btn.click(
             fn=load_discs,
@@ -422,6 +561,9 @@ with gr.Blocks() as demo:
     with gr.Row():
         start_btn = gr.Button("Konversation starten")
         save_btn = gr.Button("Diskussion speichern")
+        word_save_btn = gr.Button("Chat als Word speichern") # NEU: Word-Speichern Button
+
+    word_file_output = gr.File(label="Word-Datei herunterladen", visible=False) # Komponente für Word-Datei-Download
 
     def process_input_custom_agents(
         user_topic, chat_history, rating_state, current_usr_state,
@@ -431,19 +573,22 @@ with gr.Blocks() as demo:
         Diese Funktion ruft joint_conversation_with_selected_agents(...) auf
         und yieldet Zwischenergebnisse an Gradio.
         """
-        total = len(all_agents_list)
-        cbox_vals = args[:total]              # Checkbox booleans
-        pers_vals = args[total:2*total]       # Radios (kritisch, visionär, etc.)
-        iters = args[2*total]                # iteration_slider
-        level = args[2*total + 1]            # level_radio
-        lang = args[2*total + 2]             # lang_radio
-        discussion_id_state = args[2*total + 3]
+        num_agents_config = len(agent_config_data)
+        cbox_vals = args[:num_agents_config]
+        pers_vals = args[num_agents_config:2*num_agents_config]
+        iters = args[2*num_agents_config]
+        level = args[2*num_agents_config + 1]
+        lang = args[2*num_agents_config + 2]
+        discussion_id_state = args[2*num_agents_config + 3]
 
-        # Sammle ausgewählte Agenten
         selected_agents = []
-        for i, agn in enumerate(all_agents_list):
+        for i, agent_data in enumerate(agent_config_data):
             if cbox_vals[i]:
-                selected_agents.append({"name": agn, "personality": pers_vals[i]})
+                selected_agents.append({
+                    "name": agent_data["name"],
+                    "personality": pers_vals[i],
+                    "instruction": agent_data.get("description", "")
+                })
 
         if not selected_agents:
             yield ("Keine Agenten ausgewählt!", "", discussion_id_state, gr.update(visible=False), rating_state)
@@ -459,7 +604,7 @@ with gr.Blocks() as demo:
             expertise_level=level,
             language=lang,
             chat_history=chat_history,
-            user_state=current_usr_state,  # Hier übergeben wir den eingeloggten Nutzer
+            user_state=current_usr_state,
             discussion_id=discussion_id_state
         )
 
@@ -470,13 +615,13 @@ with gr.Blocks() as demo:
             rating_state["iteration"] = iteration_num
             rating_state["agent_name"] = agent_n
 
-            # 5 Outputs: chat_history, formatted_str, discussion_id_state, rating_row.update(visible), rating_state
             yield (
                 updated_hist,
                 formatted_output_text,
                 disc_id,
                 gr.update(visible=True),
-                rating_state
+                rating_state,
+                gr.update(visible=False) # Word-Datei Output unsichtbar machen während Konversation
             )
 
     def save_discussion_manually(
@@ -484,17 +629,22 @@ with gr.Blocks() as demo:
     ):
         """ Speichert die Diskussion. """
         if user_state_in:
-            data = load_discussion_data()
-            data[discussion_id_in] = {
-                "topic": user_topic,
-                "chat_history": history,
-                "summary": "Siehe formatierten Output",
-                "user": user_state_in
-            }
-            save_discussion_data(data)
-            return "Diskussion gespeichert."
+            active_agents_names = [agent['name'] for agent in load_agent_config()]
+            save_discussion_data_db(discussion_id_in, user_topic, active_agents_names, history, "Manuell gespeichert", user_state_in)
+            return "Diskussion in Datenbank gespeichert."
         else:
             return "Bitte zuerst einloggen."
+
+    def save_chat_word_event(history, discussion_id_in):
+        """ Event-Handler für den "Chat als Word speichern" Button. """
+        if discussion_id_in:
+            word_filename = save_chat_as_word(history, discussion_id_in)
+            if word_filename:
+                return gr.File(value=word_filename, label="Word-Datei herunterladen", visible=True) # Word-Datei File Component anzeigen
+            else:
+                return gr.File(label="Fehler beim Erstellen der Word-Datei", visible=False) # Fehlermeldung anzeigen
+        else:
+            return gr.File(label="Diskussions-ID fehlt. Starten Sie zuerst eine Konversation.", visible=False) # Fehlermeldung anzeigen
 
     def upvote_event(r_state: dict):
         did = r_state.get("discussion_id")
@@ -518,23 +668,24 @@ with gr.Blocks() as demo:
     start_btn.click(
         fn=process_input_custom_agents,
         inputs=[
-            topic_input,           # user_topic
-            chatbot,               # chat_history
-            rating_info,           # rating_state
-            user_state,            # current_usr_state
-            *agent_checkboxes,     # 43 Checkboxes
-            *agent_personalities_radios,  # 43 Radios
+            topic_input,
+            chatbot,
+            rating_info,
+            user_state,
+            *agent_checkboxes,
+            *agent_personalities_radios,
             iteration_slider,
             level_radio,
             lang_radio,
-            gr.State(None)         # discussion_id
+            gr.State(None)
         ],
         outputs=[
-            chatbot,               # (chat_history)
-            formatted_output_md,   # (formatted_output_text)
-            gr.State(),            # (discussion_id)
-            rating_row,            # (visible=True)
-            rating_info            # rating_state
+            chatbot,
+            formatted_output_md,
+            gr.State(),
+            rating_row,
+            rating_info,
+            word_file_output # Word-Datei Output Komponente hinzufügen
         ]
     )
 
@@ -542,15 +693,23 @@ with gr.Blocks() as demo:
     save_btn.click(
         fn=save_discussion_manually,
         inputs=[
-            chatbot,               # chat_history
-            topic_input,           # user_topic
-            gr.State(None),        # dummy
-            formatted_output_md,   # fmt_output
-            gr.State(),            # discussion_id_in
-            user_state             # user_state_in
+            chatbot,
+            topic_input,
+            gr.State(None),
+            formatted_output_md,
+            gr.State(),
+            user_state
         ],
-        outputs=[register_status_label]  # Z. B. in dasselbe Label wie "Registrierungs-Status"
+        outputs=[register_status_label]
     )
+
+    # Klick auf "Chat als Word speichern"
+    word_save_btn.click(
+        fn=save_chat_word_event,
+        inputs=[chatbot, gr.State()], # Benötigt Chatbot-History und Discussion-ID
+        outputs=[word_file_output] # Word-Datei Output Komponente
+    )
+
 
     upvote_btn.click(upvote_event, inputs=[rating_info], outputs=[rating_label])
     downvote_btn.click(downvote_event, inputs=[rating_info], outputs=[rating_label])

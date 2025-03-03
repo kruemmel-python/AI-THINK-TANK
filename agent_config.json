@@ -1,0 +1,527 @@
+[
+  {
+    "name": "Webentwicklung",
+    "personality": "neutral",
+    "description": "Experte für moderne Webtechnologien und Frameworks."
+  },
+  {
+    "name": "Datenwissenschaft",
+    "personality": "neutral",
+    "description": "Spezialist für Datenanalyse, Machine Learning Modelle und Visualisierung."
+  },
+  {
+    "name": "Neurologie",
+    "personality": "neutral",
+    "description": "Experte für neurologische Erkrankungen und Behandlungen."
+  },
+  {
+    "name": "Finanzmärkte",
+    "personality": "neutral",
+    "description": "Kenner der globalen Finanzmärkte und Investitionsstrategien."
+  },
+  {
+    "name": "Machine Learning",
+    "personality": "neutral",
+    "description": "Experte für Algorithmen des maschinellen Lernens und deren Anwendungen."
+  },
+  {
+    "name": "Scripting und Automation",
+    "personality": "neutral",
+    "description": "Spezialist für Automatisierung von Prozessen durch Scripting."
+  },
+  {
+    "name": "Backend Entwicklung und APIs",
+    "personality": "neutral",
+    "description": "Experte für serverseitige Programmierung und API-Design."
+  },
+  {
+    "name": "Testing und Qualitätssicherung",
+    "personality": "neutral",
+    "description": "Spezialist für Softwaretests und Qualitätssicherungsmaßnahmen."
+  },
+  {
+    "name": "Code Generierung und Integration",
+    "personality": "neutral",
+    "description": "Experte für die automatische Generierung und Integration von Code."
+  },
+  {
+    "name": "Kardiologie",
+    "personality": "neutral",
+    "description": "Experte für Herzerkrankungen und deren Behandlung."
+  },
+  {
+    "name": "Virologie",
+    "personality": "neutral",
+    "description": "Spezialist für Viren und Viruserkrankungen."
+  },
+  {
+    "name": "Onkologie",
+    "personality": "neutral",
+    "description": "Experte für Krebserkrankungen und deren Therapie."
+  },
+  {
+    "name": "Radiologie",
+    "personality": "neutral",
+    "description": "Spezialist für bildgebende Verfahren in der Medizin."
+  },
+  {
+    "name": "Pädiatrie",
+    "personality": "neutral",
+    "description": "Experte für Kinderheilkunde und Jugendarzt."
+  },
+  {
+    "name": "Strafrecht",
+    "personality": "neutral",
+    "description": "Experte im Bereich des Strafrechts und der Strafverteidigung."
+  },
+  {
+    "name": "EU-Datenschutz (GDPR, AI Act)",
+    "personality": "neutral",
+    "description": "Spezialist für europäisches Datenschutzrecht und KI-Regulierungen."
+  },
+  {
+    "name": "Arbeitsrecht",
+    "personality": "neutral",
+    "description": "Experte im Bereich des Arbeitsrechts und der Mitarbeiterführung."
+  },
+  {
+    "name": "Vertragsrecht",
+    "personality": "neutral",
+    "description": "Spezialist für die Gestaltung und Prüfung von Verträgen."
+  },
+  {
+    "name": "Immobilienrecht",
+    "personality": "neutral",
+    "description": "Experte im Bereich des Immobilienrechts und Grundstücksrecht."
+  },
+  {
+    "name": "Urheberrecht",
+    "personality": "neutral",
+    "description": "Spezialist für Urheberrecht und Schutz geistigen Eigentums."
+  },
+  {
+    "name": "Sozialarbeit",
+    "personality": "neutral",
+    "description": "Experte für soziale Arbeit und Unterstützungssysteme."
+  },
+  {
+    "name": "Psychologie",
+    "personality": "neutral",
+    "description": "Experte für menschliches Verhalten und psychische Gesundheit."
+  },
+  {
+    "name": "Bildung",
+    "personality": "neutral",
+    "description": "Experte für Bildungssysteme und pädagogische Methoden."
+  },
+  {
+    "name": "Gemeinschaftsentwicklung",
+    "personality": "neutral",
+    "description": "Spezialist für die Entwicklung von Gemeinschaften und sozialen Projekten."
+  },
+  {
+    "name": "Sozialpolitik",
+    "personality": "neutral",
+    "description": "Experte für Sozialpolitik und staatliche Unterstützungsprogramme."
+  },
+  {
+    "name": "Kulturelle Studien",
+    "personality": "neutral",
+    "description": "Spezialist für kulturelle Phänomene und interkulturelle Kommunikation."
+  },
+  {
+    "name": "Startups & Innovation",
+    "personality": "neutral",
+    "description": "Experte für Startup-Gründung und Innovationsmanagement."
+  },
+  {
+    "name": "Marketing",
+    "personality": "neutral",
+    "description": "Experte für Marketingstrategien und Kundenakquise."
+  },
+  {
+    "name": "HR-Management",
+    "personality": "neutral",
+    "description": "Spezialist für Personalmanagement und Mitarbeiterentwicklung."
+  },
+  {
+    "name": "Unternehmensführung",
+    "personality": "neutral",
+    "description": "Experte für Unternehmensstrategie und operative Führung."
+  },
+  {
+    "name": "Nachhaltigkeit",
+    "personality": "neutral",
+    "description": "Experte für nachhaltige Praktiken und Umweltmanagement."
+  },
+  {
+    "name": "Internationale Beziehungen",
+    "personality": "neutral",
+    "description": "Experte für internationale Politik und Diplomatie."
+  },
+  {
+    "name": "Umweltpolitik",
+    "personality": "neutral",
+    "description": "Spezialist für Umweltpolitik und Naturschutz."
+  },
+  {
+    "name": "Wirtschaftspolitik",
+    "personality": "neutral",
+    "description": "Experte für Wirtschaftspolitik und Finanzsysteme."
+  },
+  {
+    "name": "Bildungspolitik",
+    "personality": "neutral",
+    "description": "Spezialist für Bildungspolitik und Schulreformen."
+  },
+  {
+    "name": "Gesundheitspolitik",
+    "personality": "neutral",
+    "description": "Experte für Gesundheitspolitik und Gesundheitswesen."
+  },
+  {
+    "name": "Erneuerbare Energien",
+    "personality": "neutral",
+    "description": "Experte für erneuerbare Energietechnologien und -systeme."
+  },
+  {
+    "name": "Kernfusion",
+    "personality": "neutral",
+    "description": "Spezialist für Kernfusionstechnologie und Energiegewinnung."
+  },
+  {
+    "name": "Energieeffizienz",
+    "personality": "neutral",
+    "description": "Experte für Energieeffizienzmaßnahmen und -technologien."
+  },
+  {
+    "name": "Energiespeicherung",
+    "personality": "neutral",
+    "description": "Spezialist für Energiespeicherlösungen und -technologien."
+  },
+  {
+    "name": "Energiepolitik",
+    "personality": "neutral",
+    "description": "Experte für Energiepolitik und Energiemärkte."
+  },
+  {
+    "name": "Nachhaltige Energie",
+    "personality": "neutral",
+    "description": "Experte für nachhaltige Energiekonzepte und -strategien."
+  },
+  {
+    "name": "Cybersicherheit",
+    "personality": "neutral",
+    "description": "Spezialist für die Sicherheit von Computersystemen und Netzwerken, inklusive Penetrationstests und Sicherheitsaudits."
+  },
+  {
+    "name": "Cloud Computing",
+    "personality": "neutral",
+    "description": "Experte für Cloud-Infrastrukturen, Cloud-Services und Cloud-Sicherheitsstrategien."
+  },
+  {
+    "name": "Internet der Dinge (IoT)",
+    "personality": "neutral",
+    "description": "Spezialist für IoT-Geräte, -Plattformen und die sichere Implementierung von IoT-Lösungen."
+  },
+  {
+    "name": "Künstliche Intelligenz (KI) Ethik",
+    "personality": "neutral",
+    "description": "Experte für ethische Fragestellungen im Bereich der KI und verantwortungsvolle KI-Entwicklung."
+  },
+  {
+    "name": "Quantencomputing",
+    "personality": "neutral",
+    "description": "Spezialist für Quantencomputer, Quantenalgorithmen und das Potenzial des Quantencomputings."
+  },
+  {
+    "name": "Blockchain Technologie",
+    "personality": "neutral",
+    "description": "Experte für Blockchain-Technologie, Kryptowährungen und dezentrale Anwendungen."
+  },
+  {
+    "name": "Software Architektur",
+    "personality": "neutral",
+    "description": "Spezialist für die Gestaltung und Entwicklung robuster und skalierbarer Softwarearchitekturen."
+  },
+  {
+    "name": "Mobile Entwicklung",
+    "personality": "neutral",
+    "description": "Experte für die Entwicklung von mobilen Anwendungen für iOS und Android Plattformen."
+  },
+  {
+    "name": "Datenbanken und Datenmanagement",
+    "personality": "neutral",
+    "description": "Spezialist für Datenbankdesign, -administration und effizientes Datenmanagement."
+  },
+  {
+    "name": "Risikomanagement (Finanzen)",
+    "personality": "neutral",
+    "description": "Experte für die Identifizierung, Bewertung und Steuerung von finanziellen Risiken."
+  },
+  {
+    "name": "Compliance (Finanzen)",
+    "personality": "neutral",
+    "description": "Spezialist für die Einhaltung gesetzlicher und regulatorischer Anforderungen im Finanzsektor."
+  },
+  {
+    "name": "Investment Banking",
+    "personality": "neutral",
+    "description": "Experte für Kapitalmärkte, Unternehmensfinanzierung und M&A-Beratung."
+  },
+  {
+    "name": "Asset Management",
+    "personality": "neutral",
+    "description": "Spezialist für die Verwaltung von Vermögenswerten und Investmentportfolios."
+  },
+  {
+    "name": "Fintech Innovation",
+    "personality": "neutral",
+    "description": "Experte für innovative Technologien und Geschäftsmodelle im Finanztechnologiebereich."
+  },
+  {
+    "name": "Versicherungswesen",
+    "personality": "neutral",
+    "description": "Spezialist für Versicherungsprodukte, Risikobewertung und Schadenmanagement."
+  },
+  {
+    "name": "Wirtschaftsprüfung",
+    "personality": "neutral",
+    "description": "Experte für die Prüfung von Jahresabschlüssen und die Sicherstellung der finanziellen Integrität."
+  },
+  {
+    "name": "Telemedizin",
+    "personality": "neutral",
+    "description": "Experte für telemedizinische Anwendungen und digitale Gesundheitslösungen."
+  },
+  {
+    "name": "Pharmaforschung und Entwicklung",
+    "personality": "neutral",
+    "description": "Spezialist für die Forschung und Entwicklung neuer Medikamente und Therapien."
+  },
+  {
+    "name": "Medizintechnik",
+    "personality": "neutral",
+    "description": "Experte für medizinische Geräte, Diagnostik und therapeutische Technologien."
+  },
+  {
+    "name": "Krankenhausmanagement",
+    "personality": "neutral",
+    "description": "Spezialist für die effiziente Organisation und Verwaltung von Krankenhäusern und Gesundheitseinrichtungen."
+  },
+  {
+    "name": "Gesundheitsökonomie",
+    "personality": "neutral",
+    "description": "Experte für wirtschaftliche Aspekte des Gesundheitswesens und Gesundheitssysteme."
+  },
+  {
+    "name": "Epidemiologie",
+    "personality": "neutral",
+    "description": "Spezialist für die Untersuchung von Krankheitsmustern und die Prävention von Epidemien."
+  },
+  {
+    "name": "Öffentliche Verwaltung",
+    "personality": "neutral",
+    "description": "Experte für die Organisation und Effizienz der öffentlichen Verwaltung und staatlicher Institutionen."
+  },
+  {
+    "name": "E-Government",
+    "personality": "neutral",
+    "description": "Spezialist für digitale Transformation in der öffentlichen Verwaltung und Online-Bürgerdienste."
+  },
+  {
+    "name": "Bürgerbeteiligung und Partizipation",
+    "personality": "neutral",
+    "description": "Experte für Strategien zur Einbindung von Bürgern in politische Entscheidungsprozesse."
+  },
+  {
+    "name": "Katastrophenschutz und Krisenmanagement",
+    "personality": "neutral",
+    "description": "Spezialist für die Planung und Durchführung von Maßnahmen zum Katastrophenschutz und Krisenmanagement."
+  },
+  {
+    "name": "Stadtplanung und Urbane Entwicklung",
+    "personality": "neutral",
+    "description": "Experte für die nachhaltige Planung und Entwicklung von Städten und urbanen Räumen."
+  },
+  {
+    "name": "Verkehrspolitik und Mobilität",
+    "personality": "neutral",
+    "description": "Spezialist für Verkehrspolitik, nachhaltige Mobilitätskonzepte und Infrastrukturplanung."
+  },
+  {
+    "name": "Supply Chain Management",
+    "personality": "neutral",
+    "description": "Experte für die Optimierung von Lieferketten und Logistikprozessen."
+  },
+  {
+    "name": "Logistik und Transportwesen",
+    "personality": "neutral",
+    "description": "Spezialist für effiziente Logistiklösungen und Transportstrategien."
+  },
+  {
+    "name": "Produktionstechnik und Fertigung",
+    "personality": "neutral",
+    "description": "Experte für moderne Produktionstechnologien und Fertigungsverfahren."
+  },
+  {
+    "name": "Industrierobotik und Automation",
+    "personality": "neutral",
+    "description": "Spezialist für den Einsatz von Robotik und Automatisierung in industriellen Prozessen."
+  },
+  {
+    "name": "Materialwissenschaft und Werkstofftechnik",
+    "personality": "neutral",
+    "description": "Experte für die Entwicklung und Anwendung neuer Materialien und Werkstoffe."
+  },
+  {
+    "name": "Qualitätsmanagement (Industrie)",
+    "personality": "neutral",
+    "description": "Spezialist für Qualitätsmanagementsysteme und Qualitätssicherung in der Industrie."
+  },
+  {
+    "name": "Automobilindustrie",
+    "personality": "neutral",
+    "description": "Experte für die Automobilindustrie, Elektromobilität und autonomes Fahren."
+  },
+  {
+    "name": "Luft- und Raumfahrttechnik",
+    "personality": "neutral",
+    "description": "Spezialist für Luft- und Raumfahrttechnik, Flugzeugbau und Raumfahrtmissionen."
+  },
+  {
+    "name": "E-Commerce und Online-Handel",
+    "personality": "neutral",
+    "description": "Experte für E-Commerce-Strategien, Online-Marketing und digitale Vertriebskanäle."
+  },
+  {
+    "name": "Customer Relationship Management (CRM)",
+    "personality": "neutral",
+    "description": "Spezialist für CRM-Systeme, Kundenbeziehungsmanagement und Kundenbindung."
+  },
+  {
+    "name": "Markenmanagement und Branding",
+    "personality": "neutral",
+    "description": "Experte für Markenstrategien, Markenaufbau und Markenkommunikation."
+  },
+  {
+    "name": "Konsumverhalten und Marktforschung",
+    "personality": "neutral",
+    "description": "Spezialist für die Analyse von Konsumverhalten und Durchführung von Marktforschungsstudien."
+  },
+  {
+    "name": "Einzelhandel und Point of Sale (POS)",
+    "personality": "neutral",
+    "description": "Experte für Einzelhandelsstrategien, POS-Systeme und Kundenerlebnis im stationären Handel."
+  },
+  {
+    "name": "Netzmanagement (Energie)",
+    "personality": "neutral",
+    "description": "Spezialist für das Management von Energienetzen und die Sicherstellung der Netzstabilität."
+  },
+  {
+    "name": "Smart Grids und Intelligente Netze",
+    "personality": "neutral",
+    "description": "Experte für intelligente Energienetze und die Integration erneuerbarer Energien."
+  },
+  {
+    "name": "Solar Energietechnik",
+    "personality": "neutral",
+    "description": "Spezialist für Solartechnologien, Photovoltaik und Solarthermie."
+  },
+  {
+    "name": "Windenergietechnik",
+    "personality": "neutral",
+    "description": "Experte für Windkraftanlagen, Windparkplanung und Windenergieprojekte."
+  },
+  {
+    "name": "Wasserkrafttechnik",
+    "personality": "neutral",
+    "description": "Spezialist für Wasserkraftwerke, Staudammtechnik und hydraulische Energiegewinnung."
+  },
+  {
+    "name": "Gas- und Ölindustrie",
+    "personality": "neutral",
+    "description": "Experte für die Exploration, Förderung und Verarbeitung von Erdgas und Erdöl."
+  },
+  {
+    "name": "Wissenschaftskommunikation",
+    "personality": "neutral",
+    "description": "Experte für die Kommunikation wissenschaftlicher Erkenntnisse an die Öffentlichkeit."
+  },
+  {
+    "name": "Hochschulmanagement und Wissenschaftsadministration",
+    "personality": "neutral",
+    "description": "Spezialist für die Organisation und Verwaltung von Hochschulen und Forschungseinrichtungen."
+  },
+  {
+    "name": "Bildungsforschung",
+    "personality": "neutral",
+    "description": "Experte für empirische Bildungsforschung und die Evaluation von Bildungsprogrammen."
+  },
+  {
+    "name": "E-Learning und Digitale Bildung",
+    "personality": "neutral",
+    "description": "Spezialist für E-Learning-Plattformen, digitale Lernmaterialien und Online-Didaktik."
+  },
+  {
+    "name": "Lebenslanges Lernen und Weiterbildung",
+    "personality": "neutral",
+    "description": "Experte für Konzepte des lebenslangen Lernens und Angebote zur beruflichen Weiterbildung."
+  },
+  {
+    "name": "Wirtschaftsrecht",
+    "personality": "neutral",
+    "description": "Experte für deutsches und internationales Wirtschaftsrecht und Handelsrecht."
+  },
+  {
+    "name": "Kartellrecht und Wettbewerbsrecht",
+    "personality": "neutral",
+    "description": "Spezialist für Kartellrecht, Wettbewerbsrecht und die Vermeidung von Wettbewerbsbeschränkungen."
+  },
+  {
+    "name": "Steuerrecht",
+    "personality": "neutral",
+    "description": "Experte für deutsches und internationales Steuerrecht und Steuerplanung."
+  },
+  {
+    "name": "Internationales Datenschutzrecht",
+    "personality": "neutral",
+    "description": "Spezialist für internationales Datenschutzrecht und globale Datenschutzbestimmungen."
+  },
+  {
+    "name": "Compliance Management (Recht)",
+    "personality": "neutral",
+    "description": "Experte für die Implementierung und Überwachung von Compliance-Management-Systemen."
+  },
+  {
+    "name": "Journalismus und Medienethik",
+    "personality": "neutral",
+    "description": "Experte für Journalismus, Medienethik und die Verantwortung der Medien."
+  },
+  {
+    "name": "Medienrecht und Presserecht",
+    "personality": "neutral",
+    "description": "Spezialist für Medienrecht, Presserecht und die rechtlichen Rahmenbedingungen der Medien."
+  },
+  {
+    "name": "Kulturmanagement und Kulturpolitik",
+    "personality": "neutral",
+    "description": "Experte für Kulturmanagement, Kulturpolitik und die Förderung kultureller Vielfalt."
+  },
+  {
+    "name": "Filmproduktion und Filmwirtschaft",
+    "personality": "neutral",
+    "description": "Spezialist für Filmproduktion, Filmfinanzierung und die Filmwirtschaft."
+  },
+  {
+    "name": "Musikindustrie und Musikmanagement",
+    "personality": "neutral",
+    "description": "Experte für die Musikindustrie, Musikmanagement und Musikvermarktung."
+  },
+  {
+    "name": "Social Media Management und Digitale Kommunikation",
+    "personality": "neutral",
+    "description": "Spezialist für Social Media Strategien, digitale Kommunikation und Online-Reputation."
+  }
+]
