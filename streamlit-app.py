@@ -18,9 +18,12 @@ from google import genai
 # Import von spezifischen Typen (z. B. zur Fehlerbehandlung)
 from google.generativeai.types.generation_types import StopCandidateException
 import tornado
+import mimetypes  # Import für MIME-Type-Erkennung
+
 
 # Konstanten und globale Einstellungen
-MODEL_NAME = "gemini-2.0-pro-exp-02-05"
+MODEL_NAME_TEXT = "gemini-2.0-flash-thinking-exp-01-21"  # Für Text
+MODEL_NAME_VISION = "gemini-2.0-flash-thinking-exp-01-21"  # Für Bilder
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -217,28 +220,43 @@ def rate_agent_response(discussion_id: str, iteration: int, agent_name: str, rat
         discussion_ratings[discussion_id][iteration][agent_name]["downvotes"] += 1
     save_rating_data(discussion_ratings)
 
-# Hilfsfunktion, die analog zur process_file()-Methode arbeitet, um aus einer PDF-Datei eine Zusammenfassung zu generieren.
+# HILFSFUNKTIONEN für die Verarbeitung verschiedener Dateitypen
+
 def generate_pdf_summary_from_bytes(file_bytes: bytes, api_key: str) -> str:
+    """Generiert eine Zusammenfassung aus PDF-Bytes."""
     try:
         mime_type = "application/pdf"
-        prompt = "Fasse den Inhalt der PDF zusammen."
+        prompt = "Fasse den Inhalt der PDF zusammen. Achte darauf, dass wichtige Daten nicht verloren gehen!"
         contents = [prompt, genai.types.Part.from_bytes(data=file_bytes, mime_type=mime_type)]
-        response = call_gemini_api(contents, api_key)
+        response = call_gemini_api(contents, api_key, model=MODEL_NAME_TEXT)  # Textmodell für PDF
         return response.get("response", "Start der Konversation.")
     except Exception as e:
         logging.error("Fehler beim Generieren der PDF-Zusammenfassung:", exc_info=e)
-        return "Start der Konversation."
+        return "Fehler beim Verarbeiten der PDF."
 
-# Funktion zum Aufruf der Gemini API über den Client
-def call_gemini_api(contents: list, api_key: str) -> Dict[str, str]:
+def generate_image_summary_from_bytes(file_bytes: bytes, mime_type: str, api_key: str) -> str:
+    """Generiert eine Beschreibung/Analyse aus Bild-Bytes."""
+    try:
+        prompt = "Beschreibe den Inhalt des Bildes detailliert. Was sind die Hauptelemente, die Stimmung, und mögliche Interpretationen?"
+        contents = [prompt, genai.types.Part.from_bytes(data=file_bytes, mime_type=mime_type)]
+        response = call_gemini_api(contents, api_key, model=MODEL_NAME_VISION)  # Vision-Modell für Bilder
+        return response.get("response", "Start der Konversation.")
+    except Exception as e:
+        logging.error("Fehler beim Generieren der Bildbeschreibung:", exc_info=e)
+        return "Fehler beim Verarbeiten des Bildes."
+
+
+
+def call_gemini_api(contents: list, api_key: str, model: str) -> Dict[str, str]:
+    """Ruft die Gemini API auf, mit Modell-Auswahl."""
     client = genai.Client(api_key=api_key)
     retries = 0
     wait_time = 1
     max_wait_time = 60
     while retries < API_MAX_RETRIES:
         try:
-            logging.info(f"Sende Anfrage an Gemini: {str(contents)[:100]}... (Versuch {retries + 1})")
-            response = client.models.generate_content(model=MODEL_NAME, contents=contents)
+            logging.info(f"Sende Anfrage an Gemini ({model}): {str(contents)[:100]}... (Versuch {retries + 1})")
+            response = client.models.generate_content(model=model, contents=contents) # Modell wird übergeben
             if not hasattr(response, "text") or not response.text:
                 msg = "Leere Antwort von Gemini API."
                 logging.warning(msg)
@@ -260,15 +278,42 @@ def call_gemini_api(contents: list, api_key: str) -> Dict[str, str]:
                 return {"response": f"Fehler bei Gemini API Aufruf: {err_s}"}
     return {"response": f"Fehler: Maximale Anzahl an Versuchen erreicht ({API_MAX_RETRIES})."}
 
+
+
 def generate_summary(text: str, api_key: str) -> str:
+    """Generiert eine Textzusammenfassung (bleibt unverändert)."""
     prompt = f"Fasse den folgenden Text prägnant zusammen:\n\n{text}"
-    result = call_gemini_api([prompt], api_key)
+    result = call_gemini_api([prompt], api_key, model=MODEL_NAME_TEXT)  # Textmodell
     if SUMMARY_SLEEP_SECONDS > 0:
         time.sleep(SUMMARY_SLEEP_SECONDS)
     return result.get("response", "Fehler: Keine Zusammenfassung generiert.")
 
-# Generator-Funktion für die Konversation zwischen den Agenten.
-# Hier wird, falls eine PDF vorliegt, deren Inhalt als Bytes (über den MIME-Typ "application/pdf") an die API übergeben.
+
+
+def process_uploaded_file(uploaded_file, api_key: str) -> str:
+    """Verarbeitet die hochgeladene Datei und gibt eine Zusammenfassung/Beschreibung zurück."""
+    if uploaded_file is None:
+        return "Start der Konversation."
+
+    try:
+        file_bytes = uploaded_file.read()
+        uploaded_file.seek(0)  # Wichtig: Zurücksetzen des Dateizeigers
+        mime_type = uploaded_file.type  # MIME-Type direkt aus Streamlit-Objekt
+
+        if mime_type == "application/pdf":
+            return generate_pdf_summary_from_bytes(file_bytes, api_key)
+        elif mime_type.startswith("image"):
+            return generate_image_summary_from_bytes(file_bytes, mime_type, api_key)
+        else:
+            logging.warning(f"Nicht unterstützter Dateityp: {mime_type}")
+            return f"Nicht unterstützter Dateityp: {mime_type}"
+
+    except Exception as e:
+        logging.error(f"Fehler beim Verarbeiten der Datei: {e}", exc_info=e)
+        return "Fehler beim Verarbeiten der Datei."
+
+
+
 def joint_conversation_with_selected_agents(
     conversation_topic: str,
     selected_agents: List[Dict[str, str]],
@@ -279,7 +324,7 @@ def joint_conversation_with_selected_agents(
     user_state: str,
     discussion_id: str = None,
     api_key: str = None,
-    pdf_file = None
+    uploaded_file=None # Parameter für hochgeladene Datei
 ):
     if discussion_id is None:
         discussion_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -288,28 +333,22 @@ def joint_conversation_with_selected_agents(
     num_agents = len(active_agents_names)
     agent_outputs = [""] * num_agents
     topic_changed = False
-    logging.info(f"Konversation gestartet: {active_agents_names}, iters={iterations}, level={expertise_level}, lang={language}, Diskussions-ID: {discussion_id}, PDF: {pdf_file is not None}")
-    # PDF-Inhalt verarbeiten: Wir lesen die Bytes und generieren damit eine Zusammenfassung
-    if pdf_file is not None:
-        try:
-            pdf_file_bytes = pdf_file.read()
-            pdf_file.seek(0)
-            initial_summary = generate_pdf_summary_from_bytes(pdf_file_bytes, api_key)
-        except Exception as e:
-            logging.error(f"Fehler beim Lesen/Zusammenfassen der PDF: {e}", exc_info=e)
-            initial_summary = "Start der Konversation."
-    else:
-        initial_summary = "Start der Konversation."
+    logging.info(f"Konversation gestartet: {active_agents_names}, iters={iterations}, level={expertise_level}, lang={language}, Diskussions-ID: {discussion_id}, Datei: {uploaded_file is not None}")
+
+    # Dateiinhalt verarbeiten: Zusammenfassung/Beschreibung generieren
+    initial_summary = process_uploaded_file(uploaded_file, api_key)
     current_summary = initial_summary
+
     for i in range(iterations):
         agent_idx = i % num_agents
         current_agent_name = active_agents_names[agent_idx]
         current_agent_config = next((a for a in selected_agents if a["name"] == current_agent_name), None)
         current_personality = current_agent_config.get("personality", "neutral")
         current_instruction = current_agent_config.get("instruction", "")
+
         prompt_text = (
             f"Wir führen eine Konversation über: '{conversation_topic}'.\n"
-            + ("Zusätzliche Informationen sind in der angehängten PDF-Datei verfügbar.\n" if pdf_file is not None else "")
+            + (f"Zusätzliche Informationen sind in der angehängten Datei verfügbar.\n" if uploaded_file is not None else "")
             + f"Hier ist die Zusammenfassung der bisherigen Diskussion:\n{current_summary}\n\n"
             + f"Iteration {i+1}: Agent {current_agent_name}, bitte antworte. {current_instruction}\n"
         )
@@ -322,41 +361,66 @@ def joint_conversation_with_selected_agents(
         elif current_personality == "konservativ":
             prompt_text += "\nSei konservativ."
         prompt_text += f"\n\nAntworte auf {language}."
-        # Inhalte vorbereiten: Falls eine PDF vorliegt, wird der gleiche File-Part aus den gelesenen Bytes angehängt.
+
+        # Inhalte vorbereiten: Datei-Part anhängen, falls vorhanden.
         contents = [prompt_text]
-        if pdf_file is not None:
-            contents = [genai.types.Part.from_bytes(data=pdf_file_bytes, mime_type="application/pdf"), f"{prompt_text}"]
-        api_resp = call_gemini_api(contents, api_key)
+        if uploaded_file is not None:
+            try:
+                file_bytes = uploaded_file.read()  # Bytes erneut lesen, falls benötigt
+                uploaded_file.seek(0)
+                mime_type = uploaded_file.type
+                contents = [prompt_text, genai.types.Part.from_bytes(data=file_bytes, mime_type=mime_type)]
+            except Exception as e:
+                logging.error(f"Fehler beim Lesen der Datei für Iteration {i+1}: {e}", exc_info=e)
+                yield chat_history, f"Fehler beim Lesen der Datei in Iteration {i+1}.", discussion_id, (i + 1), current_agent_name  # Fehler melden
+                continue  # Nächste Iteration
+
+
+        api_resp = call_gemini_api(contents, api_key, model=MODEL_NAME_TEXT) # Immer Textmodell in der Konversation
         agent_output = api_resp.get("response", f"Keine Antwort von {current_agent_name}")
         agent_outputs[agent_idx] = agent_output
+
         chat_history.append({
             "role": "user",
-            "content": f"Agent {current_agent_name} (Iteration {i + 1}): Thema {conversation_topic}, Zusammenfassung bis Runde {i}: {current_summary}, PDF: {'vorhanden' if pdf_file is not None else 'nicht vorhanden'}"
+            "content": f"Agent {current_agent_name} (Iteration {i + 1}): Thema {conversation_topic}, Zusammenfassung bis Runde {i}: {current_summary}, Datei: {'vorhanden' if uploaded_file is not None else 'nicht vorhanden'}"
         })
         chat_history.append({
             "role": "assistant",
             "content": f"Antwort von Agent {current_agent_name} (Iteration {i+1}):\n{agent_output}"
         })
+
         try:
             with open(chat_history_filename, "w", encoding="utf-8") as f:
                 for message in chat_history:
                     f.write(f"{message['role']}: {message['content']}\n")
         except IOError as e:
             logging.error(f"Fehler beim Schreiben in Chatverlauf-Datei '{chat_history_filename}': {e}")
+
         new_summary_input = f"Bisherige Zusammenfassung:\n{current_summary}\n\nNeue Antwort von {current_agent_name}:\n{agent_output}"
         current_summary = generate_summary(new_summary_input, api_key)
         time.sleep(API_SLEEP_SECONDS)
+
         qual = evaluate_response(agent_output)
         if qual == "schlechte antwort":
             logging.info(f"{current_agent_name} => 'schlechte antwort', retry ...")
+             # Retry-Logik mit korrekter Behandlung der Datei
             retry_contents = ["Versuche eine kreativere Antwort."]
-            if pdf_file is not None:
-                retry_contents = [genai.types.Part.from_bytes(data=pdf_file_bytes, mime_type="application/pdf"), "Versuche eine kreativere Antwort."]
-            retry_resp = call_gemini_api(retry_contents, api_key)
+            if uploaded_file is not None:
+                try:
+                    file_bytes = uploaded_file.read() # Bytes für Retry erneut lesen
+                    uploaded_file.seek(0)
+                    mime_type = uploaded_file.type
+                    retry_contents = [genai.types.Part.from_bytes(data=file_bytes, mime_type=mime_type), "Versuche eine kreativere Antwort."]
+                except Exception as e:
+                    logging.error(f"Fehler beim Lesen der Datei für Retry: {e}", exc_info=e)
+                    yield chat_history, "Fehler beim Lesen der Datei während des Retrys.", discussion_id, (i + 1), current_agent_name
+                    continue
+            retry_resp = call_gemini_api(retry_contents, api_key, model=MODEL_NAME_TEXT) # Textmodell
             retry_output = retry_resp.get("response", f"Keine Retry-Antwort von {current_agent_name}")
             if "Fehler bei Gemini API Aufruf" not in retry_output:
                 agent_output = retry_output
             agent_outputs[agent_idx] = agent_output
+
         logging.info(f"Antwort Agent {current_agent_name} (i={i+1}): {agent_output[:50]}...")
         formatted_output_chunk = (
             f"**Iteration {i+1}: Agent {current_agent_name} ({current_personality})**\n\n"
@@ -364,13 +428,25 @@ def joint_conversation_with_selected_agents(
             "---\n\n"
         )
         yield chat_history, formatted_output_chunk, discussion_id, (i + 1), current_agent_name
+
         if i > iterations * 0.6 and agent_output == agent_outputs[(agent_idx - 1) % num_agents] and not topic_changed:
             new_topic = "Neues Thema: KI-Trends 2026"
             contents = [new_topic]
-            if pdf_file is not None:
-                contents = [genai.types.Part.from_bytes(data=pdf_file_bytes, mime_type="application/pdf"), f"{new_topic}"]
+             # Neue Themenlogik mit korrekter Behandlung der Datei
+            if uploaded_file is not None:
+                try:
+                    file_bytes = uploaded_file.read()  # Bytes erneut lesen
+                    uploaded_file.seek(0)
+                    mime_type = uploaded_file.type
+                    contents = [new_topic, genai.types.Part.from_bytes(data=file_bytes, mime_type=mime_type)]
+                except Exception as e:
+                    logging.error(f"Fehler beim Lesen der Datei für neues Thema: {e}", exc_info=e)
+                    yield chat_history, "Fehler beim Lesen der Datei beim Themenwechsel.", discussion_id, (i + 1), current_agent_name
+                    continue
+
             agent_outputs = [new_topic] * num_agents
             topic_changed = True
+
     final_summary_input = "Gesamter Chatverlauf:\n" + "\n".join(
         [f"{m['role']}: {m['content']}" for m in chat_history]
     )
@@ -379,11 +455,13 @@ def joint_conversation_with_selected_agents(
         "role": "assistant",
         "content": f"**Gesamtzusammenfassung**:\n{final_summary}"
     })
+
     if user_state:
         save_discussion_data_db(discussion_id, conversation_topic, active_agents_names, chat_history, final_summary, user_state)
         logging.info(f"Diskussion {discussion_id} für {user_state} in Datenbank gespeichert.")
     else:
         logging.info("Keine Speicherung in Datenbank, kein Benutzer eingeloggt.")
+
     final_text = agent_outputs[-1]
     chat_history.append({
         "role": "assistant",
@@ -391,6 +469,8 @@ def joint_conversation_with_selected_agents(
     })
     logging.info(f"Finale Aussage: {final_text}")
     yield chat_history, final_summary, discussion_id, None, None
+
+
 
 def save_chat_as_word(chat_history: List[Dict], discussion_id: str) -> str:
     document = Document()
@@ -414,10 +494,14 @@ def save_chat_as_word(chat_history: List[Dict], discussion_id: str) -> str:
         logging.error(f"Fehler beim Speichern der Word-Datei: {e}")
         return None
 
+
+
+
 def main():
     st.title("CipherCore Agenten-Konversation")
     st.markdown("Willkommen bei CipherCore! Ihre Plattform für sichere Programmierung und innovative KI-Lösungen.")
     st.markdown("Dieses Tool demonstriert eine Konversation zwischen verschiedenen KI-Agenten. Wählen Sie Agenten aus, geben Sie ein Thema vor und starten Sie die Diskussion.")
+
     if 'user_state' not in st.session_state:
         st.session_state['user_state'] = None
     if 'chat_history' not in st.session_state:
@@ -430,8 +514,9 @@ def main():
         st.session_state['formatted_output_text'] = ""
     if 'api_key' not in st.session_state:
         st.session_state['api_key'] = None
-    if 'pdf_file' not in st.session_state:
-        st.session_state['pdf_file'] = None
+    if 'uploaded_file' not in st.session_state: # Korrekter Key
+        st.session_state['uploaded_file'] = None  # Initialisieren
+
     st.sidebar.header("API-Schlüssel")
     api_key = st.sidebar.text_input("Geben Sie Ihren Gemini API-Schlüssel ein:", type="password")
     if not api_key:
@@ -439,6 +524,7 @@ def main():
         return
     else:
         st.session_state['api_key'] = api_key
+
     with st.expander("Login / Registrierung", expanded=False):
         col1, col2 = st.columns(2)
         with col1:
@@ -464,6 +550,7 @@ def main():
             if register_btn:
                 msg = register_user(username_register, password_register)
                 register_status.info(msg)
+
     st.markdown("---")
     agent_config_data = load_agent_config()
     agent_selections = {}
@@ -479,19 +566,30 @@ def main():
                     key=f"personality_{agent_data['name']}"
                 )
             }
+
     topic_input = st.text_input("Diskussionsthema")
     iteration_slider = st.slider("Anzahl Gesprächsrunden", 1, 50, value=10, step=1)
     level_radio = st.radio("Experten-Level", ["Beginner", "Fortgeschritten", "Experte"], horizontal=True)
     lang_radio = st.radio("Sprache", ["Deutsch", "Englisch", "Französisch", "Spanisch"], horizontal=True)
-    st.subheader("PDF-Datei hochladen (optional)")
-    uploaded_file = st.file_uploader("Wählen Sie eine PDF-Datei aus", type="pdf")
+
+    st.subheader("Datei hochladen (optional)")
+    # Akzeptiert jetzt mehrere Dateitypen
+    uploaded_file = st.file_uploader("Wählen Sie eine Datei aus (PDF, PNG, JPG, JPEG, GIF)", type=["pdf", "png", "jpg", "jpeg", "gif"])
+
+
     if uploaded_file is not None:
-        try:
-            with st.spinner('PDF wird hochgeladen...'):
-                st.session_state['pdf_file'] = uploaded_file
-                st.success("PDF-Datei hochgeladen!")
-        except Exception as e:
-            st.error(f"Fehler beim Hochladen der PDF: {e}")
+        st.session_state['uploaded_file'] = uploaded_file  # Speichern der Datei
+        # Datei-Typ-Anzeige und Vorschau
+        file_type = uploaded_file.type
+        st.write(f"Hochgeladener Dateityp: {file_type}")
+
+        if file_type.startswith("image"):
+            st.image(uploaded_file)  # Bildvorschau
+        elif file_type == "application/pdf":
+            st.write("PDF-Datei hochgeladen (Vorschau nicht unterstützt)")
+        else:
+            st.write("Datei hochgeladen") # Generische Anzeige
+
     with st.expander("Gespeicherte Diskussionen", expanded=False):
         load_disc_btn = st.button("Diskussionen laden")
         saved_discussions = st.empty()
@@ -501,13 +599,17 @@ def main():
                 saved_discussions.json(disc_data)
             else:
                 saved_discussions.warning("Bitte zuerst einloggen.")
+
     start_btn = st.button("Konversation starten")
+
     st.subheader("Agenten-Konversation")
     for message in st.session_state['chat_history']:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+
     st.subheader("Formatierter Output")
     st.markdown(st.session_state['formatted_output_text'])
+
     rating_col1, rating_col2, rating_col3 = st.columns([1, 1, 3])
     if st.session_state['rating_info'].get("iteration") is not None:
         with rating_col1:
@@ -516,6 +618,7 @@ def main():
             downvote_btn = st.button("👎 Downvote")
         with rating_col3:
             rating_label = st.empty()
+
         if upvote_btn:
             did = st.session_state['rating_info'].get("discussion_id")
             itn = st.session_state['rating_info'].get("iteration")
@@ -534,6 +637,7 @@ def main():
                 rating_label.success("👎 Downvote gegeben")
             else:
                 rating_label.error("Fehler beim Downvote (fehlende Daten).")
+
     save_col1, save_col2 = st.columns(2)
     with save_col1:
         save_btn = st.button("Diskussion speichern")
@@ -562,6 +666,7 @@ def main():
                     st.error("Fehler beim Erstellen der Word-Datei.")
             else:
                 st.warning("Diskussions-ID fehlt. Starten Sie zuerst eine Konversation.")
+
     if start_btn:
         selected_agents = [
             {"name": agent, "personality": agent_selections[agent]["personality"], "instruction": next((a["description"] for a in agent_config_data if a["name"] == agent), "")}
@@ -586,13 +691,14 @@ def main():
                         user_state=st.session_state['user_state'],
                         discussion_id=st.session_state['discussion_id'],
                         api_key=st.session_state['api_key'],
-                        pdf_file=st.session_state.get('pdf_file')
+                        uploaded_file=st.session_state.get('uploaded_file')  # Korrekter Key
                     )
                     for updated_hist, chunk_text, disc_id, iteration_num, agent_n in agent_convo:
                         st.session_state['discussion_id'] = disc_id
                         st.session_state['rating_info']["discussion_id"] = disc_id
                         st.session_state['rating_info']["iteration"] = iteration_num
                         st.session_state['rating_info']["agent_name"] = agent_n
+
                         if updated_hist and len(updated_hist) > len(st.session_state['chat_history']):
                             new_messages = updated_hist[len(st.session_state['chat_history']):]
                             for message in new_messages:
@@ -600,6 +706,7 @@ def main():
                                 with st.chat_message(message["role"]):
                                     st.markdown(message["content"])
                             st.session_state['formatted_output_text'] += chunk_text
+
             except (tornado.websocket.WebSocketClosedError, tornado.iostream.StreamClosedError) as e:
                 st.error(f"Verbindungsfehler: {e}. Bitte versuche es später erneut. Möglicherweise ist die Konversation zu lang oder das Netzwerk ist instabil.")
             except StopCandidateException as e:
