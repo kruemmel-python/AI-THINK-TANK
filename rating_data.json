@@ -1,0 +1,32 @@
+{
+    "20240115_143000": {
+        "1": {
+            "AgentA": {
+                "upvotes": 2,
+                "downvotes": 1
+            },
+            "AgentB": {
+                "upvotes": 5,
+                "downvotes": 0
+            }
+        },
+        "2": {
+             "AgentA": {
+                "upvotes": 3,
+                "downvotes": 0
+            },
+            "AgentC": {
+                "upvotes": 1,
+                "downvotes": 2
+            }
+        }
+    },
+    "20240116_100000": {
+      "1": {
+        "AgentX": {
+          "upvotes": 10,
+          "downvotes": 3
+        }
+      }
+    }
+}
